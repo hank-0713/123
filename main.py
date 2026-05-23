@@ -1,4 +1,7 @@
+import os
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
 from agent import ask
@@ -9,10 +12,12 @@ app = FastAPI(
     version="1.0.0",
 )
 
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 class QueryRequest(BaseModel):
     question: str
-    session_id: Optional[str] = None  # 預留給未來多輪對話
+    session_id: Optional[str] = None
 
 
 class QueryResponse(BaseModel):
@@ -21,8 +26,8 @@ class QueryResponse(BaseModel):
 
 
 @app.get("/")
-def root():
-    return {"status": "ok", "message": "ERP 智能查詢服務運行中"}
+def index():
+    return FileResponse("static/index.html")
 
 
 @app.get("/health")
@@ -43,4 +48,5 @@ def query(req: QueryRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

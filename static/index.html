@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ERP 智能查詢助手</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+      background: #f0f2f5;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #1565c0, #1a73e8);
+      color: #fff;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+      flex-shrink: 0;
+    }
+    .header-icon { font-size: 30px; }
+    .header-text h1 { font-size: 17px; font-weight: 700; letter-spacing: .3px; }
+    .header-text p  { font-size: 12px; opacity: .75; margin-top: 2px; }
+
+    /* ── Quick chips ── */
+    .chips {
+      background: #fff;
+      padding: 8px 14px;
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      align-items: center;
+      border-bottom: 1px solid #e0e0e0;
+      flex-shrink: 0;
+    }
+    .chips-label { font-size: 12px; color: #888; white-space: nowrap; }
+    .chip {
+      background: #e8f0fe;
+      color: #1a73e8;
+      border: none;
+      border-radius: 16px;
+      padding: 5px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background .15s;
+      white-space: nowrap;
+    }
+    .chip:hover { background: #c5d9fb; }
+
+    /* ── Chat area ── */
+    .chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scroll-behavior: smooth;
+    }
+
+    /* ── Message rows ── */
+    .row { display: flex; gap: 9px; max-width: 88%; }
+    .row.user { align-self: flex-end; flex-direction: row-reverse; max-width: 80%; }
+
+    .avatar {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+      align-self: flex-end;
+    }
+    .avatar.bot  { background: #e8f0fe; }
+    .avatar.user { background: #1a73e8; }
+
+    .bubble-wrap { display: flex; flex-direction: column; }
+    .row.user .bubble-wrap { align-items: flex-end; }
+
+    .bubble {
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 14px;
+      line-height: 1.65;
+      word-break: break-word;
+    }
+    .row.bot  .bubble {
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.1);
+      border-bottom-left-radius: 4px;
+      color: #202124;
+    }
+    .row.user .bubble {
+      background: #1a73e8;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .ts { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+    /* ── Markdown inside bot bubble ── */
+    .bubble table { border-collapse: collapse; margin: 8px 0; font-size: 13px; width: 100%; }
+    .bubble th, .bubble td { border: 1px solid #ddd; padding: 5px 10px; text-align: left; }
+    .bubble th { background: #f5f5f5; }
+    .bubble p  { margin-bottom: 6px; }
+    .bubble p:last-child { margin-bottom: 0; }
+    .bubble ul, .bubble ol { padding-left: 18px; margin: 4px 0; }
+    .bubble li { margin-bottom: 3px; }
+    .bubble h2, .bubble h3 { margin: 8px 0 4px; font-size: 14px; }
+    .bubble strong { font-weight: 600; }
+    .bubble code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+    .bubble hr { border: none; border-top: 1px solid #e0e0e0; margin: 8px 0; }
+
+    /* ── Typing dots ── */
+    .typing { display: flex; gap: 5px; align-items: center; padding: 4px 2px; }
+    .dot { width: 7px; height: 7px; background: #aaa; border-radius: 50%; animation: blink 1.2s infinite; }
+    .dot:nth-child(2) { animation-delay: .2s; }
+    .dot:nth-child(3) { animation-delay: .4s; }
+    @keyframes blink { 0%,60%,100%{ transform:translateY(0); } 30%{ transform:translateY(-5px); } }
+
+    /* ── Input bar ── */
+    .input-bar {
+      background: #fff;
+      padding: 10px 14px;
+      display: flex;
+      gap: 9px;
+      align-items: center;
+      border-top: 1px solid #e0e0e0;
+      flex-shrink: 0;
+    }
+    .input-bar input {
+      flex: 1;
+      border: 1px solid #ddd;
+      border-radius: 22px;
+      padding: 9px 16px;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border .2s;
+      background: #fafafa;
+    }
+    .input-bar input:focus { border-color: #1a73e8; background: #fff; }
+    .send-btn {
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 42px; height: 42px;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s, transform .1s;
+      flex-shrink: 0;
+    }
+    .send-btn:hover:not(:disabled) { background: #1557b0; transform: scale(1.05); }
+    .send-btn:disabled { background: #ccc; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">🤖</div>
+  <div class="header-text">
+    <h1>ERP 智能查詢助手</h1>
+    <p>用自然語言查詢財務、採購、應收帳款</p>
+  </div>
+</div>
+
+<div class="chips">
+  <span class="chips-label">快速查詢：</span>
+  <button class="chip" onclick="quickAsk('銀行帳戶目前有多少錢？')">💰 銀行餘額</button>
+  <button class="chip" onclick="quickAsk('目前有幾張未核准的傳票？')">📋 未核准傳票</button>
+  <button class="chip" onclick="quickAsk('本月進貨明細？')">📦 本月進貨</button>
+  <button class="chip" onclick="quickAsk('本年度銷售收入是多少？')">📈 年度收入</button>
+  <button class="chip" onclick="quickAsk('應收帳款餘額合計？')">💳 應收帳款</button>
+  <button class="chip" onclick="quickAsk('有哪些採購單還未交貨？')">🚚 未結採購</button>
+</div>
+
+<div class="chat" id="chat"></div>
+
+<div class="input-bar">
+  <input id="inp" type="text"
+    placeholder="請輸入問題，例如：下周有多少廠商要進貨？"
+    onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendMsg(); }" />
+  <button class="send-btn" id="sendBtn" onclick="sendMsg()" title="送出">&#9658;</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+<script>
+  marked.use({ breaks: true, gfm: true });
+
+  const chat    = document.getElementById('chat');
+  const inp     = document.getElementById('inp');
+  const sendBtn = document.getElementById('sendBtn');
+
+  function now() {
+    return new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function addMsg(html, role) {
+    const row = document.createElement('div');
+    row.className = `row ${role}`;
+    if (role === 'bot') {
+      row.innerHTML = `
+        <div class="avatar bot">🤖</div>
+        <div class="bubble-wrap">
+          <div class="bubble">${html}</div>
+          <span class="ts">${now()}</span>
+        </div>`;
+    } else {
+      row.innerHTML = `
+        <div class="bubble-wrap">
+          <div class="bubble">${html}</div>
+          <span class="ts">${now()}</span>
+        </div>
+        <div class="avatar user">👤</div>`;
+    }
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+    return row;
+  }
+
+  function showTyping() {
+    const row = document.createElement('div');
+    row.className = 'row bot';
+    row.id = 'typing';
+    row.innerHTML = `
+      <div class="avatar bot">🤖</div>
+      <div class="bubble-wrap">
+        <div class="bubble">
+          <div class="typing">
+            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+          </div>
+        </div>
+      </div>`;
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  function removeTyping() {
+    const el = document.getElementById('typing');
+    if (el) el.remove();
+  }
+
+  function escHtml(t) {
+    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  async function sendMsg() {
+    const q = inp.value.trim();
+    if (!q || sendBtn.disabled) return;
+    inp.value = '';
+    sendBtn.disabled = true;
+
+    addMsg(escHtml(q), 'user');
+    showTyping();
+
+    try {
+      const res  = await fetch('/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q })
+      });
+      const data = await res.json();
+      removeTyping();
+      if (res.ok) {
+        addMsg(marked.parse(data.answer), 'bot');
+      } else {
+        addMsg(`⚠️ 查詢失敗：${escHtml(data.detail || '請稍後再試')}`, 'bot');
+      }
+    } catch {
+      removeTyping();
+      addMsg('⚠️ 網路錯誤，請稍後再試', 'bot');
+    } finally {
+      sendBtn.disabled = false;
+      inp.focus();
+    }
+  }
+
+  function quickAsk(q) {
+    inp.value = q;
+    sendMsg();
+  }
+
+  // Welcome
+  addMsg(marked.parse(
+    '歡迎使用 **ERP 智能查詢助手**！\n\n' +
+    '請直接輸入問題，或點選上方快速查詢按鈕。\n\n' +
+    '**可查詢範圍：**\n' +
+    '- 💰 銀行存款與科目餘額\n' +
+    '- 📦 採購訂單與進貨記錄\n' +
+    '- 💳 客戶應收帳款\n' +
+    '- 📈 損益表與銷售收入\n' +
+    '- 📋 未核准傳票數量'
+  ), 'bot');
+</script>
+</body>
+</html>
