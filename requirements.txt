@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+pymssql
+anthropic
+pydantic
+python-dotenv
