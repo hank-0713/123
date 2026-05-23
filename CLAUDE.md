@@ -2,25 +2,26 @@
 
 ## 專案簡介
 讓公司主管以口語化方式查詢 SQL Server ERP 資料庫（gemio）。
-後端：FastAPI + Claude API（tool use）；前端：純 HTML 聊天介面；部署：Zeabur。
+後端：FastAPI + Claude API（tool use）；前端：純 HTML 聊天介面；Telegram Bot；部署：Zeabur。
 
 ## 技術架構
 ```
-主管瀏覽器 (Web)
-    ↓
-FastAPI (main.py)  ←→  static/index.html (前端)
-    ↓
-agent.py  →  Claude API claude-haiku-4-5-20251001 (tool use)
-    ↓
-tools/  (6 個 tool，各對應一個 SQL View)
-    ↓
-SQL Server (43.153.159.36:30147 / gemio)
+主管瀏覽器 (Web)          主管手機 (Telegram)
+        ↓                          ↓
+FastAPI (main.py)  ←→  static/index.html
+        ↓                          ↓ /telegram/webhook
+    agent.py  →  Claude API claude-haiku-4-5-20251001 (tool use)
+        ↓
+    tools/  (6 個 tool，各對應一個 SQL View)
+        ↓
+    SQL Server (43.153.159.36:30147 / gemio)
 ```
 
 ## 檔案結構
 ```
-├── main.py            FastAPI 入口，掛載靜態檔、/ask 端點
+├── main.py            FastAPI 入口，lifespan 初始化 Telegram bot
 ├── agent.py           Claude API 對話循環（多輪 tool use）
+├── telegram_bot.py    Telegram Bot handlers（webhook 模式）
 ├── config.py          讀取環境變數（os.getenv，有啟動時驗證）
 ├── db.py              pymssql 連線與 Decimal/str 序列化
 ├── static/
@@ -48,15 +49,23 @@ python main.py
 ```
 
 ## 環境變數
-| 變數 | 說明 |
-|------|------|
-| `DB_SERVER` | SQL Server IP |
-| `DB_PORT` | 連接埠 |
-| `DB_NAME` | 資料庫名稱 |
-| `DB_USER` | 帳號 |
-| `DB_PASSWORD` | 密碼 |
-| `CLAUDE_API_KEY` | Anthropic API Key |
-| `CLAUDE_MODEL` | 預設 `claude-haiku-4-5-20251001` |
+| 變數 | 必填 | 說明 |
+|------|------|------|
+| `DB_SERVER` | ✅ | SQL Server IP |
+| `DB_PORT` | ✅ | 連接埠 |
+| `DB_NAME` | ✅ | 資料庫名稱 |
+| `DB_USER` | ✅ | 帳號 |
+| `DB_PASSWORD` | ✅ | 密碼 |
+| `CLAUDE_API_KEY` | ✅ | Anthropic API Key |
+| `CLAUDE_MODEL` | — | 預設 `claude-haiku-4-5-20251001` |
+| `TELEGRAM_TOKEN` | — | BotFather 取得的 Bot Token |
+| `PUBLIC_URL` | — | Zeabur 公開網址（用於自動設定 Telegram webhook） |
+
+## Telegram Bot 設定流程
+1. 向 [@BotFather](https://t.me/BotFather) 建立 bot，取得 Token
+2. 在 Zeabur Variables 加入 `TELEGRAM_TOKEN` 與 `PUBLIC_URL`
+3. 部署後自動向 Telegram 註冊 webhook（`PUBLIC_URL/telegram/webhook`）
+4. 對 bot 發送 `/start` 開始使用
 
 ## 資料庫 Views（gemio）
 | View | 用途 |
