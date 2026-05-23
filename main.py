@@ -1,4 +1,5 @@
 import os
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
@@ -6,6 +7,9 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
 from agent import ask
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 tg_app = None
 
@@ -16,12 +20,21 @@ async def lifespan(app_: FastAPI):
     token = os.getenv("TELEGRAM_TOKEN", "")
     public_url = os.getenv("PUBLIC_URL", "").rstrip("/")
     if token:
-        from telegram_bot import build_app
-        tg_app = build_app(token)
-        await tg_app.initialize()
-        if public_url:
-            webhook_url = f"{public_url}/telegram/webhook"
-            await tg_app.bot.set_webhook(webhook_url)
+        try:
+            from telegram_bot import build_app
+            tg_app = build_app(token)
+            await tg_app.initialize()
+            logger.info("Telegram bot initialized")
+            if public_url:
+                webhook_url = f"{public_url}/telegram/webhook"
+                await tg_app.bot.set_webhook(webhook_url)
+                logger.info(f"Webhook set: {webhook_url}")
+            else:
+                logger.warning("PUBLIC_URL not set, webhook not registered")
+        except Exception as e:
+            logger.error(f"Telegram init failed: {e}")
+    else:
+        logger.warning("TELEGRAM_TOKEN not set, bot disabled")
     yield
     if tg_app:
         await tg_app.shutdown()
@@ -54,7 +67,8 @@ def index():
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    tg_status = "ok" if tg_app else "disabled"
+    return {"status": "ok", "telegram": tg_status}
 
 
 @app.post("/ask", response_model=QueryResponse)
@@ -77,6 +91,19 @@ async def telegram_webhook(request: Request):
     update = Update.de_json(data, tg_app.bot)
     await tg_app.process_update(update)
     return {"ok": True}
+
+
+@app.get("/telegram/set-webhook")
+async def set_webhook():
+    """手動重新註冊 webhook，Redeploy 後可呼叫此端點補救"""
+    if tg_app is None:
+        raise HTTPException(status_code=503, detail="Telegram bot 未設定（缺少 TELEGRAM_TOKEN）")
+    public_url = os.getenv("PUBLIC_URL", "").rstrip("/")
+    if not public_url:
+        raise HTTPException(status_code=400, detail="缺少 PUBLIC_URL 環境變數")
+    webhook_url = f"{public_url}/telegram/webhook"
+    await tg_app.bot.set_webhook(webhook_url)
+    return {"status": "ok", "webhook_url": webhook_url}
 
 
 if __name__ == "__main__":
